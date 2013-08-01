@@ -17,7 +17,7 @@ type SmoothFS struct{
 
 func (fs *SmoothFS) Root() (fs.Node, fuse.Error) {
 	fmt.Printf("Asked for root\n")
-	return Dir{FS: fs, RelPath: "", AbsPath: fs.SrcDir}, nil
+	return &Dir{FS: fs, RelPath: "", AbsPath: fs.SrcDir}, nil
 }
 
 
@@ -32,7 +32,7 @@ type Dir struct{
 	AbsPath string
 }
 
-func (d Dir) Attr() fuse.Attr {
+func (d *Dir) Attr() fuse.Attr {
 	fmt.Printf("In attr\n")
 	return fuse.Attr{
 		Inode: 1, 
@@ -42,7 +42,7 @@ func (d Dir) Attr() fuse.Attr {
 	}
 }
 
-func (d Dir) Lookup(name string, intr fs.Intr) (fs.Node, fuse.Error) {
+func (d *Dir) Lookup(name string, intr fs.Intr) (fs.Node, fuse.Error) {
 	fmt.Printf("In lookup\n")
 	absPath := filepath.Join(d.AbsPath, name)
 	relPath := filepath.Join(d.RelPath, name)
@@ -52,11 +52,11 @@ func (d Dir) Lookup(name string, intr fs.Intr) (fs.Node, fuse.Error) {
 	} else if info.IsDir() {
 		return &Dir{FS: d.FS, RelPath: relPath, AbsPath: absPath}, nil
 	} else {
-		return File{RelPath: relPath, AbsPath: absPath}, nil
+		return &File{RelPath: relPath, AbsPath: absPath}, nil
 	}
 }
 
-func (d Dir) ReadDir(intr fs.Intr) ([]fuse.Dirent, fuse.Error) {
+func (d *Dir) ReadDir(intr fs.Intr) ([]fuse.Dirent, fuse.Error) {
 	fmt.Printf("In readdir\n")
 	fp, err := os.Open(d.AbsPath)
 	if err != nil {
