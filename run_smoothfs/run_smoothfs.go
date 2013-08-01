@@ -32,5 +32,5 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fs.Serve(c, smoothfs.SmoothFS{SrcDir: flag.Arg(0)})
+	fs.Serve(c, &smoothfs.SmoothFS{SrcDir: flag.Arg(0)})
 }
