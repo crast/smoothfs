@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"fmt"
 	"syscall"
+	"time"
+	"io"
 
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
@@ -26,20 +28,18 @@ func (SmoothFS) queue() {
 }
 
 // Dir implements both Node and Handle for the root directory.
-type Dir struct{
+type Dir struct {
 	FS *SmoothFS
 	RelPath string
 	AbsPath string
 }
 
 func (d *Dir) Attr() fuse.Attr {
-	fmt.Printf("In attr\n")
-	return fuse.Attr{
-		Inode: 1, 
-		Mode: os.ModeDir | 0555,
-		Size: 42,
-		Nlink: 2,
+	info, err := os.Stat(d.AbsPath)
+	if (err != nil) {
+		return fuse.Attr{}
 	}
+	return fuseAttrFromStat(info).Attr
 }
 
 func (d *Dir) Lookup(name string, intr fs.Intr) (fs.Node, fuse.Error) {
@@ -104,16 +104,24 @@ func fuseAttrFromStat(info os.FileInfo) (fileattrs) {
 		 Size:204, Blocks:0, Blksize:4096, Flags:0x0, 
 		 Gen:0x0, Lspare:0, Qspare:[2]int64{0, 0}}*/
     
+	attr := fuse.Attr{
+		Size: uint64(info.Size()),
+		Mode: info.Mode(),
+		Mtime: info.ModTime(),
+	}
 	bits, c_ok := info.Sys().(*syscall.Stat_t)
-	inode := uint64(0)
 	if c_ok {
-		inode = bits.Ino
+		attr.Inode = bits.Ino
+		attr.Ctime = time.Unix(bits.Ctimespec.Sec, 0)
+		attr.Nlink = uint32(bits.Nlink)
+		attr.Uid = bits.Uid
+		attr.Gid = bits.Gid
 	} else {
 		fmt.Printf("%#v", info.Sys())
 	}
 	attrs := fileattrs{
     	Name: info.Name(),
-    	Attr:fuse.Attr{Inode: inode},
+    	Attr: attr,
     }
 	return attrs
 
@@ -126,15 +134,42 @@ type fileattrs struct {
 
 
 // File implements both Node and Handle for the hello file.
-type File struct{
+type File struct {
 	AbsPath string
 	RelPath string
+	fp *os.File
 }
 
-func (File) Attr() fuse.Attr {
-	return fuse.Attr{Mode: 0444}
+func (f *File) Attr() fuse.Attr {
+	info, err := os.Stat(f.AbsPath)
+	if (err != nil) {
+		return fuse.Attr{}
+	}
+	return fuseAttrFromStat(info).Attr}
+
+func (f *File) getFP() *os.File {
+	if (f.fp == nil) {
+		f.fp, _ = os.Open(f.AbsPath)
+	}
+	return f.fp
 }
 
-func (File) ReadAll(intr fs.Intr) ([]byte, fuse.Error) {
-	return []byte("hello, world\n"), nil
+func (f *File) Read(req *fuse.ReadRequest, resp *fuse.ReadResponse, intr fs.Intr) fuse.Error {
+	fmt.Println("In File.Read")
+	fp := f.getFP()
+	buf := make([]byte, req.Size)
+	read_bytes, err := fp.ReadAt(buf, req.Offset)
+	if err != nil && err != io.EOF {
+		if err == io.EOF {
+			resp.Data = nil
+			req.Respond(resp)
+		} else {
+			fmt.Println("Error: %s", err.Error())
+			return fuse.EIO
+		}
+	}
+	fmt.Printf("About to respond: %d of %d\n", read_bytes, req.Size)
+	resp.Data = buf[:read_bytes]
+	req.Respond(resp)
+	return nil
 }

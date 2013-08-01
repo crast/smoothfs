@@ -7,7 +7,7 @@ func io_slave(c chan IOReq) {
 		case req, ok := (<-c):
 			if (ok) {
 				// have data
-				req.Node.ReadAll(nil) // XXX
+				req.Node.Attr() // XXX
 			} else {
 				return
 			}
