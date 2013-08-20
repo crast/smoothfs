@@ -19,6 +19,7 @@ import "time"
     
 func fuseAttrFromStat_inner(info *os.FileInfo, attr *fuse.Attr, raw_stat *syscall.Stat_t) {
 	fuseAttrFromStat_unix(info, attr, raw_stat)
+	attr.Ctime = time.Unix(raw_stat.Ctimespec.Unix())
 	attr.Crtime = time.Unix(raw_stat.Birthtimespec.Unix())
 	attr.Flags = raw_stat.Flags
 }

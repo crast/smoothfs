@@ -1,5 +1,9 @@
 package smoothfs
 
+import (
+	"bazil.org/fuse"
+)
+
 const BLOCK_SIZE = 65536
 
 type BlockNum int
