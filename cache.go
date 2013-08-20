@@ -3,7 +3,9 @@ package smoothfs
 import (
 	"bytes"
 	"os"
+	"io"
 	"log"
+	"path/filepath"
 )
 
 
@@ -31,30 +33,50 @@ func (cf *CachedFile) Read(offset int64, length int64) []byte {
 		}
 	}
 	if len(to_retrieve) != 0 {
-		cf.RetrieveBlocks(to_retrieve)
+		if !cf.RetrieveBlocks(to_retrieve) {
+			return nil
+		}
 	}
 
 	offsetA := offset - start_block.Offset()
-	offsetB := offset + length - ((end_block - 1).Offset())
+	offsetB := offset + length - (end_block.Offset())
+	log.Printf("Offset: %d, length:%d, start_block:%d, end_block:%d, offsetA:%d, offsetB:%d", 
+		offset, length, start_block, end_block, offsetA, offsetB)
 	if start_block == end_block {
-		return cf.blocks[start_block].bytes[offsetA:offsetB]
+		bbytes := cf.blocks[start_block].bytes
+		num_bytes := len(bbytes)
+		if int64(num_bytes) >= offsetB {
+			return bbytes[offsetA:offsetB]
+		} else if int64(num_bytes) >= offsetA {
+			return bbytes[offsetA:]
+		} else {
+			log.Printf("OffsetA %d and offsetB %d not worky blockum %d %#v", offsetA, offsetB, start_block, bbytes)
+			log.Fatal("Bye.")
+			return nil
+		}
 	} else {
 		buffer := bytes.NewBuffer(cf.blocks[start_block].bytes[offsetA:])
 		for i:= start_block + 1; i < end_block; i++ {
 			buffer.Write(cf.blocks[i].bytes)
 		}
 		buffer.Write(cf.blocks[end_block].bytes[:offsetB])
+		return buffer.Bytes()
 	}
 	return nil
 }
 
-func (cf *CachedFile) RetrieveBlocks(blocks []BlockNum) {
+func (cf *CachedFile) RetrieveBlocks(blocks []BlockNum) bool {
 	for _, blocknum := range blocks {
+		rbytes := cf.reallyRead(blocknum.Offset(), BLOCK_SIZE)
+		if (rbytes == nil) {
+			return false
+		}
 		cf.blocks[blocknum] = &Block{
 			loaded: true,
-			bytes: cf.reallyRead(blocknum.Offset(), BLOCK_SIZE),
+			bytes: rbytes,
 		}
 	}
+	return true
 }
 
 func (cf *CachedFile) reallyRead(offset int64, length int) []byte {
@@ -65,10 +87,15 @@ func (cf *CachedFile) reallyRead(offset int64, length int) []byte {
 	buf := make([]byte, length)
 	n, err := fp.Read(buf)
 	if (err != nil) {
+		if (err == io.EOF) {
+			if n == 0 {
+				return nil
+			}
+		}
 		log.Fatal(err)
 	}
 	cf.last_loc = offset + int64(n)
-	return buf
+	return buf[:n]
 
 }
 
@@ -85,4 +112,14 @@ func (cf *CachedFile) getFile() *os.File {
 
 func loc_in_block(loc int64) BlockNum {
 	return BlockNum(loc / BLOCK_SIZE);
+}
+
+func NewCachedFile(f *File) *CachedFile {
+	return &CachedFile{
+		SmoothFS:f.FS, 
+		srcfile_path: f.AbsPath,
+		cachefile_path: filepath.Join(f.FS.CacheDir, f.RelPath),
+		blocks: make(map[BlockNum]*Block),
+	}
+
 }

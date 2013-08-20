@@ -10,9 +10,12 @@ import (
 	"bazil.org/fuse/fs"
 )
 
+var _ = io.Copy
+
 // FS implements the hello world file system.
 type SmoothFS struct{
 	SrcDir string
+	CacheDir string
 }
 
 func (fs *SmoothFS) Root() (fs.Node, fuse.Error) {
@@ -50,7 +53,7 @@ func (d *Dir) Lookup(name string, intr fs.Intr) (fs.Node, fuse.Error) {
 	} else if info.IsDir() {
 		return &Dir{FS: d.FS, RelPath: relPath, AbsPath: absPath}, nil
 	} else {
-		return &File{RelPath: relPath, AbsPath: absPath}, nil
+		return &File{FS: d.FS, RelPath: relPath, AbsPath: absPath}, nil
 	}
 }
 
@@ -97,7 +100,9 @@ func modeDT(mode os.FileMode) fuse.DirentType {
 type File struct {
 	AbsPath string
 	RelPath string
+	FS *SmoothFS
 	fp *os.File
+	cf *CachedFile
 }
 
 func (f *File) Attr() fuse.Attr {
@@ -105,7 +110,8 @@ func (f *File) Attr() fuse.Attr {
 	if (err != nil) {
 		return fuse.Attr{}
 	}
-	return fuseAttrFromStat(info).Attr}
+	return fuseAttrFromStat(info).Attr
+}
 
 func (f *File) getFP() *os.File {
 	if (f.fp == nil) {
@@ -114,11 +120,19 @@ func (f *File) getFP() *os.File {
 	return f.fp
 }
 
+func (f *File) getCachedFile() *CachedFile {
+	if (f.cf == nil) {
+		f.cf = NewCachedFile(f)
+	}
+	return f.cf
+}
+
 func (f *File) Read(req *fuse.ReadRequest, resp *fuse.ReadResponse, intr fs.Intr) fuse.Error {
 	fmt.Println("In File.Read")
-	fp := f.getFP()
-	buf := make([]byte, req.Size)
-	read_bytes, err := fp.ReadAt(buf, req.Offset)
+	//fp := f.getFP()
+	//buf := make([]byte, req.Size)
+	resp.Data = f.getCachedFile().Read(req.Offset, int64(req.Size))
+	/*read_bytes, err := fp.ReadAt(buf, req.Offset)
 	if err != nil && err != io.EOF {
 		if err == io.EOF {
 			resp.Data = nil
@@ -127,9 +141,9 @@ func (f *File) Read(req *fuse.ReadRequest, resp *fuse.ReadResponse, intr fs.Intr
 			fmt.Println("Error: %s", err.Error())
 			return fuse.EIO
 		}
-	}
+	})
 	fmt.Printf("About to respond: %d of %d\n", read_bytes, req.Size)
-	resp.Data = buf[:read_bytes]
+	resp.Data = buf[:read_bytes]*/
 	req.Respond(resp)
 	return nil
 }
