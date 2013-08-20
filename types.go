@@ -13,3 +13,8 @@ type IOReq struct {
 	BlockNum BlockNum
 	Result []byte
 }
+
+type fileattrs struct {
+	fuse.Attr
+	Name string
+}

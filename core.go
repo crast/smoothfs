@@ -4,8 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"fmt"
-	"syscall"
-	"time"
 	"io"
 
 	"bazil.org/fuse"
@@ -92,44 +90,6 @@ func modeDT(mode os.FileMode) fuse.DirentType {
 	} else {
 		return fuse.DT_Unknown
 	}
-}
-
-func fuseAttrFromStat(info os.FileInfo) (fileattrs) {
-	/* &syscall.Stat_t{Dev:16777218, Mode:0x41ed, Nlink:0x6, Ino:0x16013e, 
-		Uid:0x1f5, Gid:0x14, Rdev:0, Pad_cgo_0:[4]uint8{0x0, 0x0, 0x0, 0x0}, 
-		Atimespec:syscall.Timespec{Sec:1375337156, Nsec:0},
-		 Mtimespec:syscall.Timespec{Sec:1369414194, Nsec:0}, 
-		 Ctimespec:syscall.Timespec{Sec:1369414194, Nsec:0}, 
-		 Birthtimespec:syscall.Timespec{Sec:1369414179, Nsec:0}, 
-		 Size:204, Blocks:0, Blksize:4096, Flags:0x0, 
-		 Gen:0x0, Lspare:0, Qspare:[2]int64{0, 0}}*/
-    
-	attr := fuse.Attr{
-		Size: uint64(info.Size()),
-		Mode: info.Mode(),
-		Mtime: info.ModTime(),
-	}
-	bits, c_ok := info.Sys().(*syscall.Stat_t)
-	if c_ok {
-		attr.Inode = bits.Ino
-		attr.Ctime = time.Unix(bits.Ctimespec.Sec, 0)
-		attr.Nlink = uint32(bits.Nlink)
-		attr.Uid = bits.Uid
-		attr.Gid = bits.Gid
-	} else {
-		fmt.Printf("%#v", info.Sys())
-	}
-	attrs := fileattrs{
-    	Name: info.Name(),
-    	Attr: attr,
-    }
-	return attrs
-
-}
-
-type fileattrs struct {
-	fuse.Attr
-	Name string
 }
 
 
