@@ -30,9 +30,13 @@ func (fs *SmoothFS) Setup() {
 	if (fs.io_queue == nil) {
 		fs.io_queue = make(chan IOReq)
 		for i := 0; i < fs.NumSlaves; i++ {
-			go io_slave(fs.io_queue)
+			go io_slave(fs, i, fs.io_queue)
 		}
 	}
+}
+
+func (fs *SmoothFS) Destroy() {
+	close(fs.io_queue)
 }
 
 func (fs *SmoothFS) Init(req *fuse.InitRequest, resp *fuse.InitResponse, intr fs.Intr) fuse.Error{
