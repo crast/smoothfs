@@ -23,6 +23,15 @@ type CachedFile struct {
 	last_loc int64
 }
 
+func (cf *CachedFile) ReadRequest(offset int64, length int64, responder chan []byte) {
+	go (func() {
+		data := cf.Read(offset, length)
+		if data != nil {
+			responder <- data
+		}
+	})()
+}
+
 func (cf *CachedFile) Read(offset int64, length int64) []byte {
 	start_block := loc_in_block(offset)
 	end_block := loc_in_block(offset + length - 1)

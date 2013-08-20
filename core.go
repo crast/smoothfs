@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"fmt"
 	"io"
+	"log"
+	"syscall"
 
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
@@ -131,7 +133,18 @@ func (f *File) Read(req *fuse.ReadRequest, resp *fuse.ReadResponse, intr fs.Intr
 	fmt.Println("In File.Read")
 	//fp := f.getFP()
 	//buf := make([]byte, req.Size)
-	resp.Data = f.getCachedFile().Read(req.Offset, int64(req.Size))
+	reqgetter := make(chan []byte)
+	cf := f.getCachedFile()
+	cf.ReadRequest(req.Offset, int64(req.Size), reqgetter)
+	select {
+	case dbytes := <-reqgetter:
+		resp.Data = dbytes
+		req.Respond(resp)
+		return nil
+	case <-intr:
+		log.Printf("Got INTR for some reason.")
+		return fuse.Errno(syscall.EINTR)
+	}
 	/*read_bytes, err := fp.ReadAt(buf, req.Offset)
 	if err != nil && err != io.EOF {
 		if err == io.EOF {
@@ -144,6 +157,6 @@ func (f *File) Read(req *fuse.ReadRequest, resp *fuse.ReadResponse, intr fs.Intr
 	})
 	fmt.Printf("About to respond: %d of %d\n", read_bytes, req.Size)
 	resp.Data = buf[:read_bytes]*/
-	req.Respond(resp)
+	// req.Respond(resp)
 	return nil
 }
