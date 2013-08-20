@@ -10,9 +10,13 @@ func io_slave(fs *SmoothFS, id int, c chan IOReq) {
 	for {
 		select {
 		case req, ok := (<-c):
-			if (ok) {
-				// have data
-				req.Node.Attr() // XXX
+			if ok {
+				req.CachedFile.internalRead(req)
+				responder := req.Responder
+				if responder != nil {
+					log.Printf("Slave %d Sending read response block %d", id, req.BlockNum)
+					responder <- req
+				}
 			} else {
 				log.Printf("Closing io slave %d", id)
 				return

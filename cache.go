@@ -75,17 +75,30 @@ func (cf *CachedFile) Read(offset int64, length int64) []byte {
 }
 
 func (cf *CachedFile) RetrieveBlocks(blocks []BlockNum) bool {
+	signaler := make(chan IOReq)
 	for _, blocknum := range blocks {
-		rbytes := cf.reallyRead(blocknum.Offset(), BLOCK_SIZE)
-		if (rbytes == nil) {
-			return false
-		}
-		cf.blocks[blocknum] = &Block{
-			loaded: true,
-			bytes: rbytes,
+		cf.SmoothFS.io_queue <- IOReq{
+			CachedFile: cf,
+			BlockNum: blocknum,
+			Responder: signaler,
 		}
 	}
+	for i := len(blocks); i > 0; i-- {
+		f := <-signaler
+		log.Printf("Got IOReq response for block %d", f.BlockNum)
+	}
 	return true
+}
+
+func (cf *CachedFile) internalRead(req IOReq) {
+	rbytes := cf.reallyRead(req.BlockNum.Offset(), BLOCK_SIZE)
+	if (rbytes == nil) {
+		return
+	}
+	cf.blocks[req.BlockNum] = &Block{
+		loaded: true,
+		bytes: rbytes,
+	}
 }
 
 func (cf *CachedFile) reallyRead(offset int64, length int) []byte {

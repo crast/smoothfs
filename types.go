@@ -13,9 +13,9 @@ func (b BlockNum) Offset() int64 {
 }
 
 type IOReq struct {
-	Node File
+    *CachedFile
 	BlockNum BlockNum
-	Result []byte
+	Responder chan IOReq
 }
 
 type fileattrs struct {
