@@ -13,11 +13,12 @@ import (
 
 var Usage = func() {
 	fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
-	fmt.Fprintf(os.Stderr, "  %s src_dir MOUNTPOINT\n", os.Args[0])
+	fmt.Fprintf(os.Stderr, "  %s [options] src_dir MOUNTPOINT\n", os.Args[0])
 	flag.PrintDefaults()
 }
 
 func main() {
+	io_slaves := flag.Int("io_slaves", 3, "Number of I/O slaves")
 	flag.Usage = Usage
 	flag.Parse()
 
@@ -32,5 +33,10 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fs.Serve(c, &smoothfs.SmoothFS{SrcDir: flag.Arg(0)})
+	fs_obj := &smoothfs.SmoothFS{
+		SrcDir: flag.Arg(0),
+		NumSlaves: *io_slaves,
+	}
+
+	fs.Serve(c, fs_obj)
 }

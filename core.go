@@ -3,7 +3,6 @@ package smoothfs
 import (
 	"os"
 	"path/filepath"
-	"fmt"
 	"io"
 	"log"
 	"syscall"
@@ -18,11 +17,30 @@ var _ = io.Copy
 type SmoothFS struct{
 	SrcDir string
 	CacheDir string
+	NumSlaves int
+	io_queue chan IOReq
 }
 
 func (fs *SmoothFS) Root() (fs.Node, fuse.Error) {
-	fmt.Printf("Asked for root\n")
+	log.Printf("Asked for root\n")
 	return &Dir{FS: fs, RelPath: "", AbsPath: fs.SrcDir}, nil
+}
+
+func (fs *SmoothFS) Setup() {
+	if (fs.io_queue == nil) {
+		fs.io_queue = make(chan IOReq)
+		for i := 0; i < fs.NumSlaves; i++ {
+			go io_slave(fs.io_queue)
+		}
+	}
+}
+
+func (fs *SmoothFS) Init(req *fuse.InitRequest, resp *fuse.InitResponse, intr fs.Intr) fuse.Error{
+	log.Printf("In init")
+	fs.Setup()
+	resp.Flags |= fuse.InitAsyncRead
+	resp.MaxWrite = BLOCK_SIZE
+	return nil
 }
 
 
@@ -46,7 +64,7 @@ func (d *Dir) Attr() fuse.Attr {
 }
 
 func (d *Dir) Lookup(name string, intr fs.Intr) (fs.Node, fuse.Error) {
-	fmt.Printf("In lookup\n")
+	log.Printf("In lookup\n")
 	absPath := filepath.Join(d.AbsPath, name)
 	relPath := filepath.Join(d.RelPath, name)
 	info, err := os.Stat(absPath)
@@ -60,15 +78,15 @@ func (d *Dir) Lookup(name string, intr fs.Intr) (fs.Node, fuse.Error) {
 }
 
 func (d *Dir) ReadDir(intr fs.Intr) ([]fuse.Dirent, fuse.Error) {
-	fmt.Printf("In readdir\n")
+	log.Printf("In readdir\n")
 	fp, err := os.Open(d.AbsPath)
 	if err != nil {
-		fmt.Printf("error %s\n", err.Error())
+		log.Printf("error %s\n", err.Error())
 		return nil, fuse.ENOENT
 	}
 	infos, rd_err := fp.Readdir(0)
 	if rd_err != nil {
-		fmt.Printf("Read error %s\n", rd_err.Error())
+		log.Printf("Read error %s\n", rd_err.Error())
 		return nil, fuse.EIO
 	}
 	dirs := make([]fuse.Dirent, 0, len(infos))
@@ -81,7 +99,7 @@ func (d *Dir) ReadDir(intr fs.Intr) ([]fuse.Dirent, fuse.Error) {
 		}
 		dirs = append(dirs, ent)
 	}
-	fmt.Printf("numdirs: %d\n", len(dirs))
+	log.Printf("numdirs: %d\n", len(dirs))
 	return dirs, nil
 }
 
@@ -130,7 +148,7 @@ func (f *File) getCachedFile() *CachedFile {
 }
 
 func (f *File) Read(req *fuse.ReadRequest, resp *fuse.ReadResponse, intr fs.Intr) fuse.Error {
-	fmt.Println("In File.Read")
+	log.Println("In File.Read")
 	//fp := f.getFP()
 	//buf := make([]byte, req.Size)
 	reqgetter := make(chan []byte)
@@ -139,7 +157,6 @@ func (f *File) Read(req *fuse.ReadRequest, resp *fuse.ReadResponse, intr fs.Intr
 	select {
 	case dbytes := <-reqgetter:
 		resp.Data = dbytes
-		req.Respond(resp)
 		return nil
 	case <-intr:
 		log.Printf("Got INTR for some reason.")
