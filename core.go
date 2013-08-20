@@ -27,7 +27,7 @@ func (fs *SmoothFS) Root() (fs.Node, fuse.Error) {
 }
 
 func (fs *SmoothFS) Setup() {
-	if (fs.io_queue == nil) {
+	if fs.io_queue == nil {
 		fs.io_queue = make(chan IOReq)
 		for i := 0; i < fs.NumSlaves; i++ {
 			go io_slave(fs, i, fs.io_queue)
