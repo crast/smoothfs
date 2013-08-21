@@ -1,16 +1,16 @@
 package smoothfs
 
 import (
-	"syscall"
-	"os"
 	"bazil.org/fuse"
 	"fmt"
+	"os"
+	"syscall"
 )
 
-func fuseAttrFromStat(info os.FileInfo) (fileattrs) {
+func fuseAttrFromStat(info os.FileInfo) fileattrs {
 	attr := fuse.Attr{
-		Size: uint64(info.Size()),
-		Mode: info.Mode(),
+		Size:  uint64(info.Size()),
+		Mode:  info.Mode(),
 		Mtime: info.ModTime(),
 	}
 	bits, c_ok := info.Sys().(*syscall.Stat_t)
@@ -20,8 +20,8 @@ func fuseAttrFromStat(info os.FileInfo) (fileattrs) {
 		fmt.Printf("%#v", info.Sys())
 	}
 	attrs := fileattrs{
-    	Name: info.Name(),
-    	Attr: attr,
-    }
+		Name: info.Name(),
+		Attr: attr,
+	}
 	return attrs
 }

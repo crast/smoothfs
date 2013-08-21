@@ -4,7 +4,6 @@ import (
 	"log"
 )
 
-
 func io_slave(fs *SmoothFS, id int, c chan IOReq) {
 	log.Printf("Starting io slave %d", id)
 	for req := range c {

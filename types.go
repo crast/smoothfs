@@ -13,8 +13,8 @@ func (b BlockNum) Offset() int64 {
 }
 
 type IOReq struct {
-    *CachedFile
-	BlockNum BlockNum
+	*CachedFile
+	BlockNum  BlockNum
 	Responder chan IOReq
 }
 
