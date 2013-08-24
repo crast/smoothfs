@@ -8,11 +8,17 @@ import (
 	"path/filepath"
 )
 
+// struct Block represents one block in a CachedFile.
 type Block struct {
 	loaded bool
 	bytes  []byte
 }
 
+// A CachedFile connects a physical backing file with a local cache file and memory cache.
+// This allows files to be read in more sensible chunks than applications
+// often request and avoids a lot of round trips in the case of slower
+// filesystems such as network and other remote filesystems.
+// This is the primary mover and shaker of the SmoothFS ecosystem.
 type CachedFile struct {
 	*SmoothFS
 	blocks         map[BlockNum]*Block
@@ -22,6 +28,7 @@ type CachedFile struct {
 	last_loc       int64
 }
 
+// ReadRequest begins a new read request which it will respond to on responder.
 func (cf *CachedFile) ReadRequest(offset int64, length int64, responder chan []byte) {
 	go (func() {
 		data := cf.Read(offset, length)
@@ -31,6 +38,9 @@ func (cf *CachedFile) ReadRequest(offset int64, length int64, responder chan []b
 	})()
 }
 
+// Read performs the actual mechanism of reading, and returns the bytes read or nil.
+// offset is always the offset from the beginning of a file and must be a positive number.
+// length is the amount of bytes to read and must also be a positive number.
 func (cf *CachedFile) Read(offset int64, length int64) []byte {
 	start_block := loc_in_block(offset)
 	end_block := loc_in_block(offset + length - 1)
@@ -73,6 +83,7 @@ func (cf *CachedFile) Read(offset int64, length int64) []byte {
 	return nil
 }
 
+// RetrieveBlocks gets blocks from the disk representation of this file and wait for results.
 func (cf *CachedFile) RetrieveBlocks(blocks []BlockNum) bool {
 	signaler := make(chan IOReq)
 	for _, blocknum := range blocks {
@@ -135,6 +146,7 @@ func loc_in_block(loc int64) BlockNum {
 	return BlockNum(loc / BLOCK_SIZE)
 }
 
+// NewCachedFile creates a CachedFile entity from a SmoothFS file.
 func NewCachedFile(f *File) *CachedFile {
 	return &CachedFile{
 		SmoothFS:       f.FS,

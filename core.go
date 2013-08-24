@@ -1,7 +1,6 @@
 package smoothfs
 
 import (
-	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -11,21 +10,21 @@ import (
 	"bazil.org/fuse/fs"
 )
 
-var _ = io.Copy
-
-// FS implements the hello world file system.
+// SmoothFS implements an IO smoothing virtual filesystem.
 type SmoothFS struct {
-	SrcDir    string
-	CacheDir  string
+	SrcDir    string // The directory
+	CacheDir  string //
 	NumSlaves int
 	io_queue  chan IOReq
 }
 
+// Root is called to get the root directory node of this filesystem.
 func (fs *SmoothFS) Root() (fs.Node, fuse.Error) {
 	log.Printf("Asked for root\n")
 	return &Dir{FS: fs, RelPath: "", AbsPath: fs.SrcDir}, nil
 }
 
+// Setup performs setup of SmoothFS's internal fields.
 func (fs *SmoothFS) Setup() {
 	if fs.io_queue == nil {
 		fs.io_queue = make(chan IOReq)
@@ -35,6 +34,7 @@ func (fs *SmoothFS) Setup() {
 	}
 }
 
+// Destroy is called when the SmoothFS is shutting down, and cleans up internal structs.
 func (fs *SmoothFS) Destroy() {
 	close(fs.io_queue)
 }
@@ -45,10 +45,6 @@ func (fs *SmoothFS) Init(req *fuse.InitRequest, resp *fuse.InitResponse, intr fs
 	resp.Flags |= fuse.InitAsyncRead
 	resp.MaxWrite = BLOCK_SIZE
 	return nil
-}
-
-func (SmoothFS) queue() {
-
 }
 
 // Dir implements both Node and Handle for the root directory.
