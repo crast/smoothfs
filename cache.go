@@ -25,7 +25,6 @@ type CachedFile struct {
 	SrcFilePath   string // The absolute path of the file we're caching
 	CacheFilePath string // The absolute path of the cache block file.
 	fp            *os.File
-	last_loc      int64
 }
 
 // ReadRequest begins a new read request which it will respond to on responder.
@@ -111,24 +110,25 @@ func (cf *CachedFile) internalRead(req IOReq) {
 	}
 }
 
+// reallyRead is the low level read function, handles at the byte level.
 func (cf *CachedFile) reallyRead(offset int64, length int) []byte {
 	fp := cf.getFile()
-	if cf.last_loc != offset {
-		fp.Seek(offset, 0)
-	}
 	buf := make([]byte, length)
-	n, err := fp.Read(buf)
+	n, err := fp.ReadAt(buf, offset)
 	if err != nil {
 		if err == io.EOF {
 			if n == 0 {
 				return nil
 			}
+		} else {
+			log.Fatal(err)
 		}
-		log.Fatal(err)
 	}
-	cf.last_loc = offset + int64(n)
-	return buf[:n]
-
+	if n < length {
+		return buf[:n]
+	} else {
+		return buf
+	}
 }
 
 func (cf *CachedFile) getFile() *os.File {
