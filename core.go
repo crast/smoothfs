@@ -106,22 +106,10 @@ func (d *Dir) ReadDir(intr fs.Intr) ([]fuse.Dirent, fuse.Error) {
 	return dirs, nil
 }
 
-func modeDT(mode os.FileMode) fuse.DirentType {
-	if mode.IsDir() {
-		return fuse.DT_Dir
-	} else if mode.IsRegular() {
-		return fuse.DT_File
-	} else if mode&os.ModeDevice != 0 {
-		return fuse.DT_Block
-	} else {
-		return fuse.DT_Unknown
-	}
-}
-
 // File implements both Node and Handle.
 type File struct {
-	AbsPath string
-	RelPath string
+	AbsPath string // Absolute path of this file's backing file
+	RelPath string // Relative path of this file within the FUSE filesystem
 	FS      *SmoothFS
 	fp      *os.File
 	cf      *CachedFile

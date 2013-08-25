@@ -21,10 +21,10 @@ type Block struct {
 // This is the primary mover and shaker of the SmoothFS ecosystem.
 type CachedFile struct {
 	*SmoothFS
-	blocks        map[BlockNum]*Block
 	SrcFilePath   string // The absolute path of the file we're caching
 	CacheFilePath string // The absolute path of the cache block file.
 	fp            *os.File
+	blocks        map[BlockNum]*Block
 }
 
 // ReadRequest begins a new read request which it will respond to on responder.
