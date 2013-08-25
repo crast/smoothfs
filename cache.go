@@ -28,7 +28,7 @@ type CachedFile struct {
 }
 
 // ReadRequest begins a new read request which it will respond to on responder.
-func (cf *CachedFile) ReadRequest(offset int64, length int64, responder chan []byte) {
+func (cf *CachedFile) ReadRequest(offset int64, length int, responder chan []byte) {
 	go (func() {
 		data := cf.Read(offset, length)
 		if data != nil {
@@ -40,9 +40,9 @@ func (cf *CachedFile) ReadRequest(offset int64, length int64, responder chan []b
 // Read performs the actual mechanism of reading, and returns the bytes read or nil.
 // offset is always the offset from the beginning of a file and must be a positive number.
 // length is the amount of bytes to read and must also be a positive number.
-func (cf *CachedFile) Read(offset int64, length int64) []byte {
+func (cf *CachedFile) Read(offset int64, length int) []byte {
 	start_block := loc_in_block(offset)
-	end_block := loc_in_block(offset + length - 1)
+	end_block := loc_in_block(offset + int64(length) - 1)
 	var to_retrieve []BlockNum = nil
 	for i := start_block; i <= end_block; i++ {
 		if cf.blocks[i] == nil {
@@ -56,7 +56,7 @@ func (cf *CachedFile) Read(offset int64, length int64) []byte {
 	}
 
 	offsetA := offset - start_block.Offset()
-	offsetB := offset + length - (end_block.Offset())
+	offsetB := offset + int64(length) - (end_block.Offset())
 	log.Printf("Offset: %d, length:%d, start_block:%d, end_block:%d, offsetA:%d, offsetB:%d",
 		offset, length, start_block, end_block, offsetA, offsetB)
 	if start_block == end_block {
@@ -99,6 +99,7 @@ func (cf *CachedFile) RetrieveBlocks(blocks []BlockNum) bool {
 	return true
 }
 
+// internalRead performs the actual reading part of handling an IO request.
 func (cf *CachedFile) internalRead(req IOReq) {
 	rbytes := cf.reallyRead(req.BlockNum.Offset(), BLOCK_SIZE)
 	if rbytes == nil {
@@ -131,6 +132,7 @@ func (cf *CachedFile) reallyRead(offset int64, length int) []byte {
 	}
 }
 
+// getFile gets the internal file pointer of this CachedFile.
 func (cf *CachedFile) getFile() *os.File {
 	if cf.fp == nil {
 		fp, err := os.Open(cf.SrcFilePath)

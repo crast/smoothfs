@@ -155,7 +155,7 @@ func (f *File) Read(req *fuse.ReadRequest, resp *fuse.ReadResponse, intr fs.Intr
 	log.Println("In File.Read")
 	reqgetter := make(chan []byte)
 	cf := f.getCachedFile()
-	cf.ReadRequest(req.Offset, int64(req.Size), reqgetter)
+	cf.ReadRequest(req.Offset, req.Size, reqgetter)
 	select {
 	case dbytes := <-reqgetter:
 		resp.Data = dbytes
