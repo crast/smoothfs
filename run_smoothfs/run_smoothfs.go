@@ -34,7 +34,7 @@ func main() {
 	}
 
 	fs_obj := &smoothfs.SmoothFS{
-		SrcDir: flag.Arg(0),
+		SrcDir:    flag.Arg(0),
 		NumSlaves: *io_slaves,
 	}
 
