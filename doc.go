@@ -15,22 +15,22 @@ overall responsiveness from a user perspective.
 The mechanism of the "smoothing" operation is instrumented via several
 techniques:
 
-* Caching reads: Very often applications will request the same byte
-range multiple times. SmoothFS caches these bytes to avoid more
-network round-trips.
+	* Caching reads: Very often applications will request the same byte
+	  range multiple times. SmoothFS caches these bytes to avoid more
+	  network round-trips.
 
-* Larger block size reads: Many applications request e.g. 4kb at a time,
-SmoothFS increases this size and tries to do byte-aligned reads as well.
+	* Larger block size reads: Many applications request e.g. 4kb at a time,
+	  SmoothFS increases this size and tries to do byte-aligned reads as well.
 
-* Predictive reads (coming soon): Will try to prefetch data from the
-backing filesystem such that the data is on hand before the application
-requests it.
+	* Predictive reads (coming soon): Will try to prefetch data from the
+	  backing filesystem such that the data is on hand before the application
+	  requests it.
 
-* Caching stat entries in read-only mode (coming soon): Media folders tend
-to be fairly static, and yet very often a file browser will continuously or
-very often continue to stat the directory and sometimes every single file
-in said directory, incurring the latency penalty frequently. SmoothFS will
-provide optional stat caching for such mostly read-only filesystems.
+	* Caching stat entries in read-only mode (coming soon): Media folders tend
+	  to be fairly static, and yet very often a file browser will continuously
+	  stat the directory and sometimes every single file in said directory,
+	  incurring the latency penalty frequently. SmoothFS will provide optional
+	  stat caching for such mostly read-only filesystems.
 
 
 Current Status
