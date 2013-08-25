@@ -14,18 +14,18 @@ type Block struct {
 	bytes  []byte
 }
 
-// A CachedFile connects a physical backing file with a local cache file and memory cache.
+// A CachedFile connects a backing file with a local cache file and memory cache.
 // This allows files to be read in more sensible chunks than applications
 // often request and avoids a lot of round trips in the case of slower
 // filesystems such as network and other remote filesystems.
 // This is the primary mover and shaker of the SmoothFS ecosystem.
 type CachedFile struct {
 	*SmoothFS
-	blocks         map[BlockNum]*Block
-	cachefile_path string
-	srcfile_path   string
-	fp             *os.File
-	last_loc       int64
+	blocks        map[BlockNum]*Block
+	SrcFilePath   string // The absolute path of the file we're caching
+	CacheFilePath string // The absolute path of the cache block file.
+	fp            *os.File
+	last_loc      int64
 }
 
 // ReadRequest begins a new read request which it will respond to on responder.
@@ -133,7 +133,7 @@ func (cf *CachedFile) reallyRead(offset int64, length int) []byte {
 
 func (cf *CachedFile) getFile() *os.File {
 	if cf.fp == nil {
-		fp, err := os.Open(cf.srcfile_path)
+		fp, err := os.Open(cf.SrcFilePath)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -142,17 +142,13 @@ func (cf *CachedFile) getFile() *os.File {
 	return cf.fp
 }
 
-func loc_in_block(loc int64) BlockNum {
-	return BlockNum(loc / BLOCK_SIZE)
-}
-
 // NewCachedFile creates a CachedFile entity from a SmoothFS file.
 func NewCachedFile(f *File) *CachedFile {
 	return &CachedFile{
-		SmoothFS:       f.FS,
-		srcfile_path:   f.AbsPath,
-		cachefile_path: filepath.Join(f.FS.CacheDir, f.RelPath),
-		blocks:         make(map[BlockNum]*Block),
+		SmoothFS:      f.FS,
+		SrcFilePath:   f.AbsPath,
+		CacheFilePath: filepath.Join(f.FS.CacheDir, f.RelPath),
+		blocks:        make(map[BlockNum]*Block),
 	}
 
 }

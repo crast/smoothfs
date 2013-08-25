@@ -25,3 +25,8 @@ func fuseAttrFromStat(info os.FileInfo) fileattrs {
 	}
 	return attrs
 }
+
+// loc_in_block takes a byte offset and turns it into a BlockNum.
+func loc_in_block(loc int64) BlockNum {
+	return BlockNum(loc / BLOCK_SIZE)
+}

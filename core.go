@@ -12,8 +12,8 @@ import (
 
 // SmoothFS implements an IO smoothing virtual filesystem.
 type SmoothFS struct {
-	SrcDir    string // The directory
-	CacheDir  string //
+	SrcDir    string // The directory we are mirroring
+	CacheDir  string // A location locally our cache entries are stored.
 	NumSlaves int
 	io_queue  chan IOReq
 }
@@ -39,6 +39,7 @@ func (fs *SmoothFS) Destroy() {
 	close(fs.io_queue)
 }
 
+// Init is called to initialize the FUSE filesystem.
 func (fs *SmoothFS) Init(req *fuse.InitRequest, resp *fuse.InitResponse, intr fs.Intr) fuse.Error {
 	log.Printf("In init")
 	fs.Setup()
@@ -54,6 +55,7 @@ type Dir struct {
 	AbsPath string
 }
 
+// Attr gets the attributes for this directory.
 func (d *Dir) Attr() fuse.Attr {
 	info, err := os.Stat(d.AbsPath)
 	if err != nil {
@@ -62,6 +64,7 @@ func (d *Dir) Attr() fuse.Attr {
 	return fuseAttrFromStat(info).Attr
 }
 
+// Lookup a sub-path within this directory, returning a node or error.
 func (d *Dir) Lookup(name string, intr fs.Intr) (fs.Node, fuse.Error) {
 	log.Printf("In lookup\n")
 	absPath := filepath.Join(d.AbsPath, name)
@@ -76,6 +79,7 @@ func (d *Dir) Lookup(name string, intr fs.Intr) (fs.Node, fuse.Error) {
 	}
 }
 
+// ReadDir is called by FUSE to list the entries within this directory.
 func (d *Dir) ReadDir(intr fs.Intr) ([]fuse.Dirent, fuse.Error) {
 	log.Printf("In readdir\n")
 	fp, err := os.Open(d.AbsPath)
@@ -114,7 +118,7 @@ func modeDT(mode os.FileMode) fuse.DirentType {
 	}
 }
 
-// File implements both Node and Handle for the hello file.
+// File implements both Node and Handle.
 type File struct {
 	AbsPath string
 	RelPath string
@@ -123,6 +127,7 @@ type File struct {
 	cf      *CachedFile
 }
 
+// Attr is called by FUSE to get attributes of this file.
 func (f *File) Attr() fuse.Attr {
 	info, err := os.Stat(f.AbsPath)
 	if err != nil {
@@ -145,10 +150,9 @@ func (f *File) getCachedFile() *CachedFile {
 	return f.cf
 }
 
+// Read is called by FUSE to read a specific range of bytes from this file.
 func (f *File) Read(req *fuse.ReadRequest, resp *fuse.ReadResponse, intr fs.Intr) fuse.Error {
 	log.Println("In File.Read")
-	//fp := f.getFP()
-	//buf := make([]byte, req.Size)
 	reqgetter := make(chan []byte)
 	cf := f.getCachedFile()
 	cf.ReadRequest(req.Offset, int64(req.Size), reqgetter)
@@ -160,18 +164,5 @@ func (f *File) Read(req *fuse.ReadRequest, resp *fuse.ReadResponse, intr fs.Intr
 		log.Printf("Got INTR for some reason.")
 		return fuse.Errno(syscall.EINTR)
 	}
-	/*read_bytes, err := fp.ReadAt(buf, req.Offset)
-	if err != nil && err != io.EOF {
-		if err == io.EOF {
-			resp.Data = nil
-			req.Respond(resp)
-		} else {
-			fmt.Println("Error: %s", err.Error())
-			return fuse.EIO
-		}
-	})
-	fmt.Printf("About to respond: %d of %d\n", read_bytes, req.Size)
-	resp.Data = buf[:read_bytes]*/
-	// req.Respond(resp)
 	return nil
 }
