@@ -14,11 +14,9 @@ func (b BlockNum) Offset() int64 {
 	return int64(b) * BLOCK_SIZE
 }
 
-// An IOReq is a block read that is handled on one of the background IO slaves.
-type IOReq struct {
-	*CachedFile
-	BlockNum  BlockNum
-	Responder chan IOReq
+type WorkEntry interface {
+	Process()
+	Responder() chan WorkEntry
 }
 
 type fileattrs struct {

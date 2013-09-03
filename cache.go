@@ -10,7 +10,8 @@ import (
 
 // struct Block represents one block in a CachedFile.
 type Block struct {
-	loaded bool
+	OnDisk bool
+	Loaded bool
 	bytes  []byte
 }
 
@@ -25,6 +26,7 @@ type CachedFile struct {
 	CacheFilePath string // The absolute path of the cache block file.
 	fp            *os.File
 	blocks        map[BlockNum]*Block
+	dirty_blocks  []BlockNum
 }
 
 // ReadRequest begins a new read request which it will respond to on responder.
@@ -45,7 +47,7 @@ func (cf *CachedFile) Read(offset int64, length int) []byte {
 	end_block := loc_in_block(offset + int64(length) - 1)
 	var to_retrieve []BlockNum = nil
 	for i := start_block; i <= end_block; i++ {
-		if cf.blocks[i] == nil {
+		if blk := cf.blocks[i]; blk == nil || !blk.Loaded {
 			to_retrieve = append(to_retrieve, i)
 		}
 	}
@@ -84,31 +86,33 @@ func (cf *CachedFile) Read(offset int64, length int) []byte {
 
 // RetrieveBlocks gets blocks from the disk representation of this file and wait for results.
 func (cf *CachedFile) RetrieveBlocks(blocks []BlockNum) bool {
-	signaler := make(chan IOReq)
+	signaler := make(chan WorkEntry)
+	io_queue := cf.SmoothFS.io_queue
 	for _, blocknum := range blocks {
-		cf.SmoothFS.io_queue <- IOReq{
+		io_queue <- &CacheIOReq{
 			CachedFile: cf,
 			BlockNum:   blocknum,
-			Responder:  signaler,
+			responder:  signaler,
 		}
 	}
 	for i := len(blocks); i > 0; i-- {
 		f := <-signaler
-		log.Printf("Got IOReq response for block %d", f.BlockNum)
+		log.Printf("Got IOReq response for block %d", f.(*CacheIOReq).BlockNum)
 	}
 	return true
 }
 
 // internalRead performs the actual reading part of handling an IO request.
-func (cf *CachedFile) internalRead(req IOReq) {
+func (cf *CachedFile) internalRead(req CacheIOReq) {
 	rbytes := cf.reallyRead(req.BlockNum.Offset(), BLOCK_SIZE)
 	if rbytes == nil {
 		return
 	}
 	cf.blocks[req.BlockNum] = &Block{
-		loaded: true,
+		Loaded: true,
 		bytes:  rbytes,
 	}
+	cf.dirty_blocks = append(cf.dirty_blocks, req.BlockNum)
 }
 
 // reallyRead is the low level read function, handles at the byte level.
@@ -153,4 +157,49 @@ func NewCachedFile(f *File) *CachedFile {
 		blocks:        make(map[BlockNum]*Block),
 	}
 
+}
+
+
+// An IOReq is a block read that is handled on one of the background IO slaves.
+type CacheIOReq struct {
+	*CachedFile            // The CachedFile which is doing this read request.
+	BlockNum    BlockNum   // The block number to read.
+	responder   chan WorkEntry // A channel we are expected to respond on.
+}
+
+func (req *CacheIOReq) Process() {
+	req.internalRead(*req)
+	if len(req.dirty_blocks) > 2 {
+		req.SmoothFS.clean_queue <- &CacheCleanReq{req.CachedFile}
+	}
+}
+
+func (req *CacheIOReq) Responder() chan WorkEntry {
+	return req.responder
+}
+
+
+type CacheCleanReq struct {
+	*CachedFile
+}
+
+func (req *CacheCleanReq) Process() {
+	db := req.CachedFile.dirty_blocks
+	l := len(db)
+	if l == 0 {
+		return
+	} else if l == 1 {
+		req.CachedFile.dirty_blocks = nil
+	} else {
+		req.CachedFile.dirty_blocks = db[1:]
+	}
+	blockNum := db[0]
+	block := req.blocks[blockNum]
+	if block.Loaded {
+		log.Printf("Going to unload block %d")
+	}
+}
+
+func (req *CacheCleanReq) Responder() chan WorkEntry {
+	return nil
 }

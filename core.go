@@ -15,7 +15,8 @@ type SmoothFS struct {
 	SrcDir    string // The directory we are mirroring
 	CacheDir  string // A location locally our cache entries are stored.
 	NumSlaves int
-	io_queue  chan IOReq
+	io_queue  chan WorkEntry
+	clean_queue chan WorkEntry
 }
 
 // Root is called to get the root directory node of this filesystem.
@@ -27,16 +28,21 @@ func (fs *SmoothFS) Root() (fs.Node, fuse.Error) {
 // Setup performs setup of SmoothFS's internal fields.
 func (fs *SmoothFS) Setup() {
 	if fs.io_queue == nil {
-		fs.io_queue = make(chan IOReq)
+		fs.io_queue = make(chan WorkEntry)
 		for i := 0; i < fs.NumSlaves; i++ {
 			go io_slave(fs, i, fs.io_queue)
 		}
+	}
+	if fs.clean_queue == nil {
+		fs.clean_queue = make(chan WorkEntry)
+		go io_slave(fs, fs.NumSlaves, fs.clean_queue)
 	}
 }
 
 // Destroy is called when the SmoothFS is shutting down, and cleans up internal structs.
 func (fs *SmoothFS) Destroy() {
 	close(fs.io_queue)
+	close(fs.clean_queue)
 }
 
 // Init is called to initialize the FUSE filesystem.
